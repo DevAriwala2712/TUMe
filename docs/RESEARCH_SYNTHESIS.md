@@ -2,6 +2,8 @@
 
 _Date: 2026-10-26 · Method: desk research + code audit · Status: hypotheses, not validated with users_
 
+**Historical material:** this document was inherited from NanoClaw-Next. It does not define TUMe's implemented functionality or current competitive standing. Use [PRODUCT.md](PRODUCT.md), [PLAN.md](PLAN.md) and [PROVENANCE.md](PROVENANCE.md) for the product direction. Early claims below that competitors universally use static knobs or fail hard are too broad; current model-serving systems also fit, queue, load and unload models.
+
 ## Research overview
 
 **Question.** Where do people running LLMs on small devices (Raspberry Pi 5, Jetson, old laptops, mini-PCs) get stuck, and which of those problems is NanoClaw-Next positioned to solve better than existing tools?

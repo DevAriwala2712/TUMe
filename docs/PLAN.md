@@ -1,92 +1,51 @@
-# Plan: from "<2 MB agent OS" to an adaptive edge-inference scheduler
+# TUMe product roadmap
 
-_Derived from [RESEARCH_SYNTHESIS.md](RESEARCH_SYNTHESIS.md). Date: 2026-10-26._
+Updated: 2026-11-06. This roadmap is a sequence of product milestones, not a claim that the maintenance features exist. The archived [NanoClaw-Next plan](RESEARCH_PLAN.md) is inherited research context, not this product's implementation plan.
 
-## Positioning
+## T0 — Establish the product and provenance
 
-> **Given the memory actually free on this device right now, the latency budget, and how sensitive the request is, run the best model × context that fits. When things go wrong, step down a rung instead of crashing, and explain why.**
+Repository identity, independent README, product scope, architecture, staged roadmap, source lineage and benchmark labeling. Preserve the inherited research code/history. No new runtime behavior, inference experiments or model downloads are part of T0.
 
-What we are **not** building: another agent harness competing on binary size (NullClaw, PicoClaw and ZeroClaw already own that), or an inference engine (llama.cpp already is one). We drive llama.cpp; the contribution is the decision layer and the evidence.
+## T1 — Read-only device health
 
-## Architecture
+Collect bounded Linux resource/service snapshots and emit deterministic findings for a small documented set of conditions. Include memory pressure, disk capacity and selected service failures; report missing permissions/sensors. Define the initial target device/workload and collection/retention budgets before implementation.
 
-```
-          request (prompt, ctx need, max tokens, deadline, sensitive?)
-                               │
- ┌─────────────┐   ┌───────────▼────────────┐   ┌──────────────────┐
- │ sysmem      │──▶│ scheduler (pure)        │◀──│ catalog          │
- │ MemAvailable│   │ ladder: shrink ctx →    │   │ GGUF metadata →  │
- │ cgroup v2   │   │ smaller model → cloud?  │   │ weights + KV/tok │
- │ PSI / sysctl│   │ → refuse (with reason)  │   │ + calibration    │
- └─────────────┘   └───────────┬────────────┘   └────────▲─────────┘
-                               │ choice + trace          │ measured peak RSS,
-                   ┌───────────▼────────────┐            │ tokens/s
-                   │ backend: llama.cpp CLI  │────────────┘
-                   │ hard timeout, wait4 RSS │
-                   │ OOM-kill → retry 1 rung │
-                   └─────────────────────────┘
-```
+Exit: fixture-defined findings are correct; collection overhead and failure behavior meet the chosen budget; observation works without any model or network service. Publish an honest status report.
 
-## Milestones
+## T2 — Useful, budgeted diagnosis
 
-### M1: Honest, measurable foundation _(this branch)_
-| Item | Acceptance |
-|---|---|
-| `edge/sysmem`: Linux `/proc/meminfo`, cgroup v2 `memory.max`/`memory.current`, `/proc/pressure/memory`; macOS `hw.memsize` × `kern.memorystatus_level` | Parsers unit-tested with fixtures; `probe` prints a live snapshot |
-| `edge/gguf`: read architecture, layers, heads, KV heads, head dims, trained context from the GGUF header | Unit test on a synthetic GGUF; skips large tokenizer arrays |
-| `edge/estimate`: weights + KV(ctx) + overhead; overhead and tokens/s learned from `state/calibration.tsv` | Unit-tested formula; calibration round-trip test |
-| `edge/scheduler`: pure ladder with an explainable trace | Unit tests: fits, shrinks context, steps down a model, cloud only if not sensitive, refuses with a reason, honours the deadline |
-| `edge/proc`: spawn with stdin, poll, **hard-kill on timeout**, capture peak RSS via `wait4` | Tested on macOS with real child processes |
-| Backend: `LOCAL_LLM_CMD` template with `{model}` `{ctx}` `{n}` `{prompt_file}`; OOM or crash → exclude that rung and retry | Tested with a fake LLM script that simulates an OOM kill |
-| Sandbox: executable **allowlist** + hard timeout; remove the fake "seccomp active" output | Policy tests: `/usr/bin/curl`, `bash -c`, `python3 -c` all denied |
-| Cloud: removed until real; never chosen for sensitive requests | Scheduler test |
-| CLI: `probe`, `plan` (dry run, `--available-mb` to simulate), `bench` (CSV + p50/p95 + peak RSS) | Manual run on macOS |
-| README: claims replaced with measured numbers and method | Binary size measured per target |
+Provide on-demand explanations grounded in selected findings/log excerpts. Admit inference only within a declared budget; defer when it would threaten the protected workload. Evaluate stronger/smaller model choices for diagnostic correctness and refusal behavior, using upstream research rather than assuming model fit implies quality.
 
-**M1 status (2026-10-26):** done and run against real SmolLM2 1.7B/360M (llama.cpp 0.7.0, CPU) on an Apple Silicon Mac. What the real runs taught us, now fixed:
-- Uncalibrated memory was under-estimated by up to 44% because of CPU weight repacking. The default now assumes 2× weights, and `calibrate` measures the real figure.
-- Latency ignored model load and prompt time, so a run was killed at its deadline. Startup time is now measured and added.
-- The 360M model writes wrong shell commands. `run` now prefers quality for both steps; the small model is only for memory/deadline pressure.
-- llama.cpp's `--fit` handles single-model memory fitting. Position NanoClaw-Next above it.
+Exit: a held-out diagnostic suite meets predefined correctness and unsupported-claim limits; evidence references are valid; monitoring remains available during inference failure and budget exhaustion.
 
-### M2: Evidence on real hardware _(needs a Pi 5 4 GB and a Linux box)_
-**M2 status (2026-11-06): in progress.** First Linux evidence collected in a 4 GiB Ubuntu ARM64 VM on Apple Silicon. Under a real 1.5 GiB cgroup cap, fixed 1.7B @ 4096 failed 5/5 with OOM kills; the scheduler selected 360M @ 4096 and completed 5/5 (end-to-end p50/p95 810/911 ms). A separate fault-injection run recovered from a real OOM on attempt two. Linux tests passed 32/32, selftest 10/10. [Cap comparison and raw evidence](benchmarks/2026-11-05-linux-vm/REPORT.md).
+## T3 — Explicitly permitted recovery
 
-The VM calibration grid is now measured for both 1.7B and 360M at Q4_K_M, Q5_K_M and Q8_0: calibration at 512/4096, then three repetitions at held-out 1024/2048/8192 contexts, 54/54 completed with no OOM kills and maximum absolute RSS error 0.0583% (target <10%). The VM was temporarily enlarged to 8 GiB, with a 6 GiB cap per command, for this accuracy experiment. [Grid report, method and data](benchmarks/2026-11-06-quantization-grid/REPORT.md).
+Add a small registry of maintenance procedures with typed arguments, permissions, preconditions, retry/rate limits, verification and audit records. Start with operator-approved actions; consider automatic recovery only for individually enabled procedures after validation. Implement a narrow privilege boundary before claiming safe autonomous administration.
 
-Still outstanding: physical Pi validation, the PSI-pressure policy/experiment, and broader prompt/quality coverage. PSI is currently read but is not a scheduler input; pre-emptive switching during inference needs implementation before item 3 can pass. VM results do not close the hardware milestone.
+Exit: permitted repairs succeed on defined fault scenarios; forbidden/unsupported actions are rejected; verification distinguishes repair from command completion; rollback/failure behavior and repeated-fault handling are demonstrated.
 
-1. Run `scripts/compare-linux.sh`: a cgroup-capped (`MemoryMax=1.5G`) comparison of fixed llama.cpp at default context vs the NanoClaw-Next scheduler on the same prompts. Report the success rate, p50/p95 latency and peak RSS.
-2. Calibrate estimate error: predicted vs measured peak RSS across Q4_K_M, Q5_K_M and Q8_0 at 512–8k context. Target error under 10%.
-3. Pressure experiment: a background memory hog ramps up mid-run; show pre-emptive step-down when PSI `some avg10` rises.
-4. Publish the results table in the README.
+## T4 — API and web portal
 
-### M3: Real isolation for tool execution
-- Landlock (filesystem: read-only home, writable `state/`), seccomp-bpf (deny `connect`, `ptrace`, `mount`), `PR_SET_NO_NEW_PRIVS`, and dropping to a dedicated user.
-- Tests run on Linux CI (GitHub Actions `ubuntu-latest` + `aarch64` runner).
-- Only after this lands may the README mention sandboxing.
+Expose device state, findings, evidence, budgets, proposed procedures and action outcomes. Include authentication/authorization, bounded inputs, cancellation and audit for mutation. Keep the portal optional for headless use. Define endpoints and UI flows in a milestone design before implementation.
 
-### M4: Persistent engine and smarter policies
-- Link `libllama` or drive a long-lived `llama-server`, so weights stay mapped between requests and swap cost is paid only on a model change.
-- KV cache quantization (`q8_0`) as an extra rung on the ladder.
-- Learned latency model (prompt-processing and generation tokens/s per model), thermal-throttle awareness on the Pi.
-- Optional cloud backend (OpenAI-compatible HTTP), off by default.
+Exit: operators can diagnose and authorize supported actions through a consistent API; access boundaries hold; whole-system footprint remains within the declared target.
 
-### M5: Agent layer (only after M2 shows a win)
-Revisit hierarchical memory, skills and tool fallback, which exist today as experimental scaffolding.
+## T5 — Security-event and maintenance adapters
 
-## What unlocks the most potential
+Evaluate integration with existing event/security tools and update systems rather than building every detector or updater. Begin with read-only event import and explanation. Measure false positives, missed labeled events and diagnostic usefulness before making cyberattack-detection claims. Updates and network-policy changes need separately scoped procedures and authorization.
 
-1. **The scheduler + calibration loop (M1)** turns the project from claims into a tool that behaves differently from Ollama under memory pressure. Everything else depends on it.
-2. **The capped benchmark (M2)** is the single artifact that makes the project credible to reviewers, employers and users.
-3. **A persistent engine (M4)** removes the per-request model-load cost, which otherwise eats the latency budget on a Pi.
+Exit: each adapter has a documented input contract, permissions, bounded overhead, failure behavior and an evaluated operator use case.
 
-## Risks
+## T6 — Fleet and selected integrations
 
-| Risk | Mitigation |
-|---|---|
-| Ollama adds adaptive fallback | Stay focused on explainable, deadline-aware choices and a reproducible benchmark; both are useful even then |
-| Estimates are wrong on GPU/Metal backends | Calibration from measured RSS; M2 error target |
-| Per-request process spawn is slow | M4 persistent engine; benchmarks report load time separately |
-| Name collision with NanoClaw | Decide on a rename (EdgeMorph / NanoEdge Runtime) after checking availability |
-| Zig 0.15.2 `zig build` fails on macOS 27 (linker can't read the new SDK) | Documented workaround: `zig build-exe … -target aarch64-macos.15.0`; CI on Linux |
+Add only validated needs: device enrollment/identity, fleet views, notification channels or update orchestration. Keep connectors opt-in and account for their child processes and persistent storage. General assistant feature parity is not a completion criterion.
+
+Exit: the supported device/workload scale, authorization boundaries, failure recovery and total resource budgets are measured and documented.
+
+## Cross-cutting acceptance
+
+- Count the full footprint: controller, collectors, models, adapters, isolation and persistent state. Report idle and active operation separately.
+- Report correct diagnoses/repairs, false/unsupported recommendations, refusals, resource violations, end-to-end latency and availability of the protected workload.
+- Monitoring and deterministic emergency policies work without an LLM. Operational authority comes from explicit policy, not generated text.
+- No physical Pi validation, security accuracy, continuous supervision or product RAM target is yet established by inherited inference benchmarks.
+- Feature implementation requires its own design and verification; the current setup does not start those milestones or run new experiments.
