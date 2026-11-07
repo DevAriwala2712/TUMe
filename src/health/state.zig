@@ -6,6 +6,7 @@ const findings = @import("findings.zig");
 const probe = @import("probe.zig");
 const report = @import("report.zig");
 const types = @import("types.zig");
+const strict_json = @import("strict_json.zig");
 
 pub const Freshness = enum { fresh, absent, stale, invalid, incompatible, unavailable };
 
@@ -149,6 +150,7 @@ fn decode(a: std.mem.Allocator, bytes: []const u8, target: types.Target, now: ty
     const version = root.object.get("schema_version") orelse return invalid;
     if (version != .integer or version.integer < 0) return invalid;
     if (version.integer != report.version) return .{ .freshness = .incompatible };
+    if (!strict_json.matches(report.Wire, root)) return invalid;
     var wire = std.json.parseFromValueLeaky(report.Wire, a, root, .{}) catch return invalid;
     if (wire.mode != .watch or !types.validBootId(wire.boot_id)) return invalid;
     if (!config.sameTarget(wire.target, target)) return .{ .freshness = .incompatible };

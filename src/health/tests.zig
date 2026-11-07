@@ -18,6 +18,8 @@ test "tume health task 1 canonical config" {
         "{\"mount\":\"/\",\"services\":[\"-a.service\"]}",
         "{\"mount\":\"/\",\"services\":[\"a.service\",\"a.service\"]}",
         "{\"mount\":\"/\",\"thermal_zone\":\"3\"}",
+        "{\"mount\":[47]}",
+        "{\"mount\":\"/\",\"state_dir\":[47]}",
         "{\"mount\":\"/\",\"extra\":true}",
         " " ** 4097,
     }) |input| try testing.expectError(error.InvalidConfig, config.parse(a, input));
@@ -343,6 +345,18 @@ test "tume health task 4 durable local status" {
     reboot.boot_id[0] = 'a';
     try testing.expect(other.load(a, target, reboot).report == null);
     try testing.expectEqual(.stale, other.load(a, target, reboot).freshness);
+
+    const valid_bytes = try dir.readFileAlloc(a, "latest.json", 65536);
+    const timestamp = "\"sampled_at_boot_ms\":60000";
+    const start = std.mem.indexOf(u8, valid_bytes, timestamp).?;
+    for ([_][]const u8{
+        "\"sampled_at_boot_ms\":1.8446744073709552e19",
+        "\"sampled_at_boot_ms\":\"60000\"",
+    }) |replacement| {
+        const malformed = try std.mem.concat(a, u8, &.{ valid_bytes[0..start], replacement, valid_bytes[start + timestamp.len ..] });
+        try dir.writeFile(.{ .sub_path = "latest.json", .data = malformed });
+        try testing.expectEqual(.invalid, other.load(a, target, testStamp(60000)).freshness);
+    }
 
     try dir.writeFile(.{ .sub_path = "latest.json", .data = "{\"schema_version\":2,\"future\":true}" });
     try testing.expectEqual(.incompatible, other.load(a, target, testStamp(60000)).freshness);

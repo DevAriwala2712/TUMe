@@ -1,5 +1,6 @@
 const std = @import("std");
 const types = @import("types.zig");
+const strict_json = @import("strict_json.zig");
 
 const Wire = struct {
     mount: []const u8,
@@ -35,9 +36,14 @@ fn lessThan(_: void, a: []const u8, b: []const u8) bool {
 /// Config strings are owned by the caller's arena.
 pub fn parse(allocator: std.mem.Allocator, bytes: []const u8) !types.Config {
     if (bytes.len > 4096) return error.InvalidConfig;
-    const wire = std.json.parseFromSliceLeaky(Wire, allocator, bytes, .{
+    const parsed = std.json.parseFromSliceLeaky(std.json.Value, allocator, bytes, .{
         .allocate = .alloc_always,
     }) catch |err| switch (err) {
+        error.OutOfMemory => return err,
+        else => return error.InvalidConfig,
+    };
+    if (!strict_json.matches(Wire, parsed)) return error.InvalidConfig;
+    const wire = std.json.parseFromValueLeaky(Wire, allocator, parsed, .{}) catch |err| switch (err) {
         error.OutOfMemory => return err,
         else => return error.InvalidConfig,
     };

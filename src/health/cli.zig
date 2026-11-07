@@ -90,11 +90,11 @@ pub fn run(allocator: std.mem.Allocator, args: []const []const u8) u8 {
         return 2;
     };
     if (options.mode != .snapshot and loaded.state_dir == null) {
-        std.debug.print("health config: state_dir is required for watch and status\\n", .{});
+        std.debug.print("health config: state_dir is required for watch and status\n", .{});
         return 2;
     }
     if (options.mode == .status) return status(a, loaded) catch |err| {
-        std.debug.print("health: {s}\\n", .{@errorName(err)});
+        std.debug.print("health: {s}\n", .{@errorName(err)});
         return 3;
     };
     const result = switch (options.mode) {
