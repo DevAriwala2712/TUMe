@@ -29,6 +29,8 @@ The [earlier v0.1 draft](SPEC_DIRECTION_AND_V01.md) sketches a broader collector
 
 ## T2 — Diagnosis without compromising the workload
 
+The [T2.1 design draft](superpowers/specs/2026-11-07-incident-timeline-design.md) covers local incident history, optional journal metadata and deterministic next checks.
+
 | Work package | Feature and boundaries | Acceptance evidence |
 |---|---|---|
 | T2.1 Incident timeline and next checks | Keep a small, time- and byte-bounded incident history with transitions, observations and selected journal evidence from configured sources. Join service state changes, boot and relevant version changes. Redact credentials before storage or display, preserve timestamps and provenance, and report evidence gaps and truncation. Offer deterministic next checks for all T1 findings. | Replay labeled incidents with duplicate, truncated, stale, reordered and hostile records. Correct timestamps, source IDs and next checks, with stable state after a crash or disk-limit hit. Seeded secrets do not appear in output. |
