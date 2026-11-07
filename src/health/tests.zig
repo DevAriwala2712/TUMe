@@ -151,3 +151,105 @@ test "tume health task 2 disk descriptor refuses a symlink" {
         return error.ExpectedSymlinkRejection;
     } else |_| {}
 }
+
+const types = @import("types.zig");
+const findings = @import("findings.zig");
+const cli = @import("cli.zig");
+const target: types.Target = .{ .mount = "/", .services = &.{"gateway.service"}, .thermal_zone = null };
+
+fn testStamp(at: u64) types.Stamp {
+    return .{ .boot_id = "fbce98d7-91ea-4477-818a-0bee5324792c".*, .unix_ms = @intCast(at), .boot_ms = at };
+}
+
+fn testSample(services: []const types.Service) types.Sample {
+    return .{
+        .stamp = testStamp(0),
+        .collection_ms = 120,
+        .memory = .{ .value = .{ .total_bytes = 1 << 30, .available_bytes = 512 << 20 } },
+        .memory_psi_bp = .{ .value = 0 },
+        .cpu_psi_bp = .{ .reason = .unsupported },
+        .disk_used_bp = .{ .value = 7000 },
+        .services = services,
+        .temperature_mc = null,
+    };
+}
+
+test "tume health task 3 threshold transitions" {
+    var arena = std.heap.ArenaAllocator.init(testing.allocator);
+    defer arena.deinit();
+    const a = arena.allocator();
+    var state: findings.State = .{};
+    var service = [_]types.Service{.{ .unit = target.services[0], .state = .{ .value = .failed } }};
+    var sample = testSample(&service);
+    try testing.expectEqual(@as(usize, 0), (try findings.advance(a, &state, target, sample)).len);
+    sample.stamp = testStamp(15000);
+    try testing.expectEqual(.service_unavailable, (try findings.advance(a, &state, target, sample))[0].rule_id);
+    sample.stamp = testStamp(30000);
+    service[0].state = .{ .value = .activating };
+    const transitioning = (try findings.advance(a, &state, target, sample))[0];
+    try testing.expect(!transitioning.input_evaluable);
+    try testing.expectEqual(@as(i64, 15000), transitioning.opened_at_unix_ms);
+    sample.stamp = testStamp(45000);
+    service[0].state = .{ .reason = .unsupported };
+    try testing.expect(!(try findings.advance(a, &state, target, sample))[0].input_evaluable);
+    service[0].state = .{ .value = .active };
+    sample.stamp = testStamp(60000);
+    try testing.expectEqual(@as(usize, 1), (try findings.advance(a, &state, target, sample)).len);
+    sample.stamp = testStamp(75000);
+    try testing.expectEqual(@as(usize, 0), (try findings.advance(a, &state, target, sample)).len);
+
+    sample.memory.value.available_bytes = 134217728;
+    sample.memory_psi_bp.value = 999;
+    sample.disk_used_bp.value = 8999;
+    try testing.expectEqual(@as(usize, 0), (try findings.instant(a, target, sample)).len);
+    sample.memory.value.available_bytes = 134217727;
+    sample.memory_psi_bp.value = 1000;
+    sample.disk_used_bp.value = 9000;
+    const breaches = try findings.instant(a, target, sample);
+    try testing.expectEqual(@as(usize, 3), breaches.len);
+    try testing.expectEqual(.disk_capacity_high, breaches[0].rule_id);
+    try testing.expectEqual(.memory_headroom_low, breaches[1].rule_id);
+    try testing.expectEqual(.memory_stalled, breaches[2].rule_id);
+    try testing.expectEqual(@as(usize, 0), (try findings.advance(a, &state, target, sample)).len);
+    try testing.expectEqual(@as(usize, 3), (try findings.advance(a, &state, target, sample)).len);
+
+    sample.memory.value.available_bytes = 167772160;
+    sample.memory_psi_bp.value = 499;
+    sample.disk_used_bp.value = 8500;
+    try testing.expectEqual(@as(usize, 3), (try findings.advance(a, &state, target, sample)).len);
+    sample.memory.value.available_bytes = 167772159;
+    sample.memory_psi_bp.value = 500;
+    sample.disk_used_bp.value = 8501;
+    try testing.expectEqual(@as(usize, 3), (try findings.advance(a, &state, target, sample)).len);
+    sample.memory.value.available_bytes = 167772160;
+    sample.memory_psi_bp.value = 499;
+    sample.disk_used_bp.value = 8500;
+    try testing.expectEqual(@as(usize, 3), (try findings.advance(a, &state, target, sample)).len);
+    try testing.expectEqual(@as(usize, 0), (try findings.advance(a, &state, target, sample)).len);
+}
+
+test "tume health task 3 snapshot contract" {
+    var arena = std.heap.ArenaAllocator.init(testing.allocator);
+    defer arena.deinit();
+    const a = arena.allocator();
+    const sample = testSample(&.{.{ .unit = target.services[0], .state = .{ .value = .failed } }});
+    const stdout = try cli.snapshot(a, target, sample);
+    const json = (try std.json.parseFromSlice(std.json.Value, a, stdout, .{})).value.object;
+    try testing.expectEqual(@as(i64, 1), json.get("schema_version").?.integer);
+    try testing.expectEqualStrings("snapshot", json.get("mode").?.string);
+    try testing.expectEqual(@as(i64, 120), json.get("collection_ms").?.integer);
+    const finding = json.get("findings").?.array.items[0].object;
+    try testing.expectEqualStrings("service:gateway.service", finding.get("evidence_key").?.string);
+    const observations = json.get("observations").?.array.items;
+    try testing.expectEqual(@as(usize, 5), observations.len);
+    for (observations) |observation| {
+        const key = observation.object.get("key").?.string;
+        try testing.expect(!std.mem.eql(u8, key, "sensor.temperature"));
+        if (std.mem.eql(u8, key, "host.cpu_psi")) {
+            try testing.expectEqual(.null, std.meta.activeTag(observation.object.get("value").?));
+            try testing.expectEqualStrings("unsupported", observation.object.get("reason").?.string);
+        }
+    }
+    try testing.expect(!json.contains("streaks"));
+    try testing.expect(stdout.len <= 65536 and stdout[stdout.len - 1] == '\n');
+}
