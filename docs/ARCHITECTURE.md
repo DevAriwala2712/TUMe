@@ -1,6 +1,6 @@
 # Architecture direction and module boundaries
 
-Status: proposed product architecture, not implemented modules. Existing implementation is the inherited NanoClaw-Next research CLI.
+Status: T1 implements local observation, deterministic checks and bounded latest-report state. The remaining boundaries describe planned product work.
 
 ## Boundaries
 
@@ -20,10 +20,11 @@ Status: proposed product architecture, not implemented modules. Existing impleme
 
 - `src/edge/`: inherited memory probing, GGUF parsing, cost estimates, scheduler, subprocess wrapper and llama.cpp command adapter.
 - `src/runtime/`: inherited executable allowlist, timeout and rollback journal. These are not the proposed product privilege boundary or verified recovery engine.
-- `src/app.zig`, `src/main.zig`: inherited `nanoclaw-next` CLI. No monitoring daemon or HTTP API exists.
+- `src/app.zig`, `src/main.zig`: inherited `nanoclaw-next` CLI, with early dispatch to the T1 health command group.
+- `src/health/`: T1 collector, bounded probe helpers, findings, report and local watcher. See the [operator guide](operations/linux-health.md).
 - Historical memory/skill scaffolding is not a functioning maintenance subsystem.
 
-Keep existing executable/configuration identifiers stable until a separately reviewed runtime change deliberately migrates them. This repository setup changes documentation and repository metadata only.
+Keep existing executable/configuration identifiers stable until a separately reviewed runtime change deliberately migrates them.
 
 ## Intended flow
 

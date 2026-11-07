@@ -1,0 +1,26 @@
+[Unit]
+Description=TUMe read-only Linux device health watcher
+StartLimitIntervalSec=60s
+StartLimitBurst=3
+
+[Service]
+Type=simple
+User=tume-health
+Group=tume-health
+ExecStart=/usr/local/bin/nanoclaw-next health watch --config /etc/tume/health.json
+StateDirectory=tume
+StateDirectoryMode=0700
+NoNewPrivileges=yes
+UMask=0077
+ProtectSystem=strict
+RestrictAddressFamilies=AF_UNIX
+MemoryAccounting=yes
+CPUAccounting=yes
+KillMode=control-group
+TasksMax=8
+TimeoutStopSec=3s
+Restart=on-failure
+RestartSec=5s
+
+[Install]
+WantedBy=multi-user.target

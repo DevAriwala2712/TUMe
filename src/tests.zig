@@ -10,3 +10,7 @@ test {
     _ = @import("runtime/sandbox.zig");
     _ = @import("app.zig");
 }
+
+test {
+    _ = @import("health/tests.zig");
+}

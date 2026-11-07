@@ -3,6 +3,7 @@ const app_mod = @import("app.zig");
 const App = app_mod.App;
 const config = @import("config.zig");
 const scheduler = @import("edge/scheduler.zig");
+const health = @import("health/cli.zig");
 
 const config_path = "nanoclaw-next.conf";
 
@@ -18,6 +19,7 @@ fn printUsage() void {
             "  nanoclaw-next run [--prompt TEXT | --interactive]\n" ++
             "  nanoclaw-next prompt                    interactive run\n" ++
             "  nanoclaw-next selftest                  model-free checks for this device\n" ++
+            "  nanoclaw-next health {{snapshot|watch|status}} --config PATH   Linux device health\n" ++
             "\n" ++
             "Request flags:\n" ++
             "  --ctx N --min-ctx N --tokens N --deadline-ms N --sensitive\n" ++
@@ -115,6 +117,11 @@ fn realMain() !void {
         return;
     }
     const cmd = args[1];
+    if (std.mem.eql(u8, cmd, "health")) {
+        const code = health.run(allocator, args[2..]);
+        if (code != 0) std.process.exit(code);
+        return;
+    }
 
     if (std.mem.eql(u8, cmd, "--demo")) {
         printDemo();
