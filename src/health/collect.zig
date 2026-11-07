@@ -115,3 +115,65 @@ pub fn stamp() !types.Stamp {
         .boot_ms = try bootMillis(),
     };
 }
+
+const probe = @import("probe.zig");
+
+pub const Kernel = struct {
+    memory: Reading(types.Memory),
+    memory_psi_bp: Reading(u16),
+    cpu_psi_bp: Reading(u16),
+};
+
+fn read(comptime T: type, path: []const u8, parse: fn ([]const u8) Reading(T)) Reading(T) {
+    var buffer: [kernel_read_limit + 1]u8 = undefined;
+    return switch (readKernel(path, &buffer)) {
+        .value => |data| parse(data),
+        .reason => |reason| .{ .reason = reason },
+    };
+}
+
+pub fn take(allocator: std.mem.Allocator, target: types.Target, sampled: types.Stamp, runner: *probe.Runner) !types.Sample {
+    return assemble(allocator, target, sampled, runner, .{
+        .memory = read(types.Memory, "/proc/meminfo", memory),
+        .memory_psi_bp = read(u16, "/proc/pressure/memory", psi),
+        .cpu_psi_bp = read(u16, "/proc/pressure/cpu", psi),
+    });
+}
+
+pub fn assemble(allocator: std.mem.Allocator, target: types.Target, sampled: types.Stamp, runner: *probe.Runner, kernel: Kernel) !types.Sample {
+    const deadline = sampled.boot_ms +| 1500;
+    const services = try allocator.alloc(types.Service, target.services.len);
+    const disk_used_bp: Reading(u16) = switch (runner.run(.{ .disk = target.mount }, deadline)) {
+        .disk => |bp| .{ .value = bp },
+        .reason => |reason| .{ .reason = reason },
+        else => unreachable,
+    };
+    for (services, target.services) |*service, unit| {
+        service.* = .{
+            .unit = unit,
+            .state = switch (runner.run(.{ .service = unit }, deadline)) {
+                .service => |value| .{ .value = value },
+                .reason => |reason| .{ .reason = reason },
+                else => unreachable,
+            },
+        };
+    }
+    const temperature_mc: ?Reading(i32) = if (target.thermal_zone) |zone|
+        switch (runner.run(.{ .temperature = zone }, deadline)) {
+            .temperature => |value| .{ .value = value },
+            .reason => |reason| .{ .reason = reason },
+            else => unreachable,
+        }
+    else
+        null;
+    return .{
+        .stamp = sampled,
+        .collection_ms = (runner.now() orelse sampled.boot_ms) -| sampled.boot_ms,
+        .memory = kernel.memory,
+        .memory_psi_bp = kernel.memory_psi_bp,
+        .cpu_psi_bp = kernel.cpu_psi_bp,
+        .disk_used_bp = disk_used_bp,
+        .services = services,
+        .temperature_mc = temperature_mc,
+    };
+}

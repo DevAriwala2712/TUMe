@@ -30,3 +30,124 @@ test "tume health task 1 memory and PSI stay independent" {
     try testing.expectEqual(@as(u16, 101), collect.psi("some avg10=1.005 avg60=0.00 total=4\n").value);
     try testing.expectEqual(.invalid, collect.psi("some avg10=nan total=4\n").reason);
 }
+
+const probe = @import("probe.zig");
+
+const FakeProbe = struct {
+    now: u64 = 0,
+    spawns: usize = 0,
+    kills: usize = 0,
+    reaped: bool = false,
+    budget_expired: bool = false,
+
+    fn from(ctx: ?*anyopaque) *FakeProbe {
+        return @ptrCast(@alignCast(ctx.?));
+    }
+
+    fn clock(ctx: ?*anyopaque) ?u64 {
+        return from(ctx).now;
+    }
+
+    fn start(ctx: ?*anyopaque, request: probe.Request) ?probe.Child {
+        const self = from(ctx);
+        self.spawns += 1;
+        if (request == .disk and self.budget_expired) {
+            self.now = 1500;
+            return null;
+        }
+        return .{ .pid = 1, .out = 3 };
+    }
+
+    fn drain(ctx: ?*anyopaque, _: *probe.Child, _: *probe.Capture, delay_ms: u16) probe.DrainError!void {
+        from(ctx).now += delay_ms;
+    }
+
+    fn reap(ctx: ?*anyopaque, _: probe.Child) ?u32 {
+        return if (from(ctx).reaped) 0 else null;
+    }
+
+    fn kill(ctx: ?*anyopaque, _: probe.Child) void {
+        from(ctx).kills += 1;
+    }
+
+    fn close(_: ?*anyopaque, child: *probe.Child) void {
+        child.out = -1;
+        child.err = -1;
+    }
+
+    fn runner(self: *FakeProbe) probe.Runner {
+        return .{ .ops = .{
+            .ctx = self,
+            .clock = clock,
+            .start = start,
+            .drain = drain,
+            .reap = reap,
+            .kill = kill,
+            .close = close,
+        } };
+    }
+};
+
+test "tume health task 2 bounded helper lifecycle" {
+    var fake = FakeProbe{};
+    var runner = fake.runner();
+    try testing.expectEqual(.timeout, runner.run(.{ .disk = "/" }, 1500).reason);
+    try testing.expectEqual(@as(u64, 250), fake.now);
+    try testing.expectEqual(.unavailable, runner.run(.{ .service = "gateway.service" }, 1500).reason);
+    try testing.expectEqual(@as(usize, 1), fake.spawns);
+    try testing.expectEqual(@as(usize, 1), fake.kills);
+    fake.reaped = true;
+    runner.stop();
+    try testing.expectEqual(@as(usize, 1), fake.kills);
+    try testing.expect(runner.child == null);
+}
+
+test "tume health task 2 typed probes" {
+    var capture = probe.Capture{};
+    try capture.add("x" ** 4096, true);
+    try testing.expectError(error.OutputLimit, capture.add("x", false));
+    try testing.expectEqual(.unsupported, probe.serviceReply(1, "LoadState=not-found\nActiveState=inactive\n").reason);
+    try testing.expectEqual(.unavailable, probe.serviceReply(1, "LoadState=loaded\nActiveState=failed\n").reason);
+    try testing.expectEqual(.activating, probe.serviceReply(0, "LoadState=loaded\nActiveState=activating\n").service);
+    try testing.expectEqual(@as(u16, 9000), probe.diskReply(110, 20, 10, true).disk);
+    try testing.expectEqual(.invalid, probe.diskReply(10, 10, 0, true).reason);
+    try testing.expectEqual(.unsupported, probe.diskReply(110, 20, 10, false).reason);
+    try testing.expectEqual(@as(i32, -500), probe.thermalReply("-500\n").temperature);
+}
+
+test "tume health task 2 collection keeps kernel data after external probe failure" {
+    var fake = FakeProbe{ .budget_expired = true };
+    var runner = fake.runner();
+    const sample = try collect.assemble(testing.allocator, .{
+        .mount = "/",
+        .services = &.{"gateway.service"},
+        .thermal_zone = 0,
+    }, .{ .boot_id = undefined, .boot_ms = 0, .unix_ms = 0 }, &runner, .{
+        .memory = .{ .value = .{ .total_bytes = 1000, .available_bytes = 100 } },
+        .memory_psi_bp = .{ .value = 120 },
+        .cpu_psi_bp = .{ .value = 50 },
+    });
+    defer testing.allocator.free(sample.services);
+    try testing.expectEqual(@as(u64, 100), sample.memory.value.available_bytes);
+    try testing.expectEqual(@as(u16, 120), sample.memory_psi_bp.value);
+    try testing.expectEqual(.unavailable, sample.disk_used_bp.reason);
+    try testing.expectEqual(.timeout, sample.services[0].state.reason);
+    try testing.expectEqual(.timeout, sample.temperature_mc.?.reason);
+    try testing.expectEqual(@as(usize, 1), fake.spawns);
+}
+
+test "tume health task 2 disk descriptor refuses a symlink" {
+    if (@import("builtin").os.tag != .linux) return error.SkipZigTest;
+    var temp = testing.tmpDir(.{});
+    defer temp.cleanup();
+    try temp.dir.makeDir("real");
+    try temp.dir.symLink("real", "link", .{ .is_directory = true });
+    var path: [std.fs.max_path_bytes]u8 = undefined;
+    const resolved_parent = try temp.dir.realpath(".", &path);
+    const link = try std.fs.path.join(testing.allocator, &.{ resolved_parent, "link" });
+    defer testing.allocator.free(link);
+    if (probe.openDirectory(link)) |fd| {
+        std.posix.close(fd);
+        return error.ExpectedSymlinkRejection;
+    } else |_| {}
+}
