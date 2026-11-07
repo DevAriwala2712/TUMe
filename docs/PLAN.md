@@ -1,51 +1,79 @@
 # TUMe product roadmap
 
-Updated: 2026-11-06. This roadmap is a sequence of product milestones, not a claim that the maintenance features exist. The archived [NanoClaw-Next plan](RESEARCH_PLAN.md) is inherited research context, not this product's implementation plan.
+Updated 2026-11-07. TUMe is in product incubation. The inherited NanoClaw-Next CLI supplies research memory probing, scheduling, calibration and llama.cpp integration. T1 code is implemented with Linux deployment and pilot validation pending. T2–T6 remain proposed. The [market review](MARKET.md) maps existing products and potential deployments to TUMe's build, integrate and defer decisions. The [research plan](RESEARCH_PLAN.md) records upstream work.
 
-## T0 — Establish the product and provenance
+**Next gate.** Run the Linux installation smoke test and the authorized Pi pilot. See the [T1 design](superpowers/specs/2026-11-07-linux-health-design.md) and [implementation plan](superpowers/plans/2026-11-07-linux-health.md) for the implemented scope. The proposed pilot is one Raspberry Pi 4 Model B with 2 GiB RAM running a Mosquitto gateway workload. T1 gives an operator a local read-only snapshot and sustained findings with no network or model. Test whether the evidence and resource profile are worth adding to a gateway that could already use systemd and Monit. Measure against Netdata where the configurations are comparable. Confirm the hardware, workload and gates before treating that setup as the product target.
 
-Repository identity, independent README, product scope, architecture, staged roadmap, source lineage and benchmark labeling. Preserve the inherited research code/history. No new runtime behavior, inference experiments or model downloads are part of T0.
+## Release sequence
+
+| Milestone | Deliverable | Dependency and release gate |
+|---|---|---|
+| T0 | Product scope, source history and evidence lineage | Repository setup recorded in [provenance](PROVENANCE.md). |
+| T1 | Local Linux snapshot, continuous watch and deterministic findings | Review the T1 design. Ship a model-free pilot only after correctness, offline operation and whole-service budget gates. |
+| T2 | Evidence-based diagnosis and admission control | T1 observation contract. Prove useful and grounded output, explicit refusals and protected workload performance. |
+| T3 | Operator-approved, independently verified recovery | T1 findings, system identity and protected service definition. Can start from deterministic findings without T2. Gate on isolated actions, crash safety, evidence of recovery and audited authorization. |
+| T4 | Local read-only API and portal, then action workflows | Reads can build on T1. Mutations require the T3 policy boundary. Gate access control and full footprint separately. |
+| T5 | Optional telemetry, alert, hardware, security and update adapters | Each adapter depends only on the records and transport it consumes. Pilot demand and a scoped data, privilege and budget contract determine which ships. |
+| T6 | Enrolled, intermittently connected fleet and rollout reporting | Proven local behavior, a stable read API and per-adapter contracts. Gate identity, isolation, bounded queues and reconciliation before fleet mutation. |
+
+Keep each later work package behind its own implementation design and plan. Define exact interfaces, retention, threat model, resource ceilings and an evaluation fixture set before its code is written. The capabilities and tests below define what each package should deliver and what must be demonstrated before release.
 
 ## T1 — Read-only device health
 
-Collect bounded Linux resource/service snapshots and emit deterministic findings for a small documented set of conditions. Include memory pressure, disk capacity and selected service failures; report missing permissions/sensors. Define the initial target device/workload and collection/retention budgets before implementation.
+The [earlier v0.1 draft](SPEC_DIRECTION_AND_V01.md) sketches a broader collector. This implementation uses CPU PSI, fixed thresholds and one latest report. Journal evidence and history are T2 work. Inode capacity, restart counts, onboard power and storage checks, and additional self-accounting remain candidates after the first pilot. See [current evidence](evidence/T1-linux-health.md).
 
-Exit: fixture-defined findings are correct; collection overhead and failure behavior meet the chosen budget; observation works without any model or network service. Publish an honest status report.
+- **T1.1 Snapshot contract.** Sample memory, memory and CPU stall pressure, one local disk, up to four selected systemd services, and one optional thermal sensor. Report unsupported, denied, invalid, timed-out or truncated inputs explicitly. Publish versioned JSON with exact observation keys and units.
+- **T1.2 Deterministic findings.** Open and clear memory headroom, memory stall, disk pressure and service-failure findings with named thresholds, evidence and hysteresis. Preserve gaps in coverage. Surface instantaneous findings in a standalone snapshot.
+- **T1.3 Watch and service.** Schedule non-overlapping samples and persist bounded state. Make local status freshness explicit across restart, config changes and reboot. Ship an unprivileged unit, an example configuration and install/remove instructions.
+- **Exit.** Correct fixture outcomes across all rules, an x86_64 Linux smoke test and a physical Pi run without network or model. Proposed pilot limits include 16 MiB p95 service cgroup memory, 32 MiB peak, average CPU at most 1% of one core and zero broker delivery loss or OOM kills. See the [design and pilot protocol](superpowers/specs/2026-11-07-linux-health-design.md).
 
-## T2 — Useful, budgeted diagnosis
+## T2 — Diagnosis without compromising the workload
 
-Provide on-demand explanations grounded in selected findings/log excerpts. Admit inference only within a declared budget; defer when it would threaten the protected workload. Evaluate stronger/smaller model choices for diagnostic correctness and refusal behavior, using upstream research rather than assuming model fit implies quality.
+| Work package | Feature and boundaries | Acceptance evidence |
+|---|---|---|
+| T2.1 Incident timeline and next checks | Keep a small, time- and byte-bounded incident history with transitions, observations and selected journal evidence from configured sources. Join service state changes, boot and relevant version changes. Redact credentials before storage or display, preserve timestamps and provenance, and report evidence gaps and truncation. Offer deterministic next checks for all T1 findings. | Replay labeled incidents with duplicate, truncated, stale, reordered and hostile records. Correct timestamps, source IDs and next checks, with stable state after a crash or disk-limit hit. Seeded secrets do not appear in output. |
+| T2.2 Diagnostic admission and isolation | On-demand, local-only explanations. Admit one job at a time using host and ancestor cgroup limits, pressure, time, token/output caps and measured model estimates. Defer or refuse when measurements are missing or the workload reserve is threatened. Cancel on new pressure or deadline; account for descendants and release resources after abort. Keep optional inference outside the monitoring process. Adopt upstream scheduling logic selectively with a source record. | Fake backends exercise no model, hanging children, cancellation, insufficient headroom and sudden pressure. Verify cleanup and uninterrupted monitoring. Measure idle, startup, active and aborted whole-device impact during authorized trials. |
+| T2.3 Grounded explanations | Return structured observations, cited evidence IDs, possible cause, uncertainty and next checks. An optional recommendation names a registered procedure and carries no permission. Use an inconclusive result on inadequate evidence or invalid citations. Start with one preinstalled backend. Evaluate an optional resident server only against the same task and resource baseline. | Use held-out, labeled fault scenarios and insufficient-evidence controls. Before evaluation, set minimum correct diagnosis and maximum unsupported claims, plus a budget and refusal target. Report per-fault results, citation validity, false certainty, useful refusals, time and total cost per correct diagnosis against T2.1. |
 
-Exit: a held-out diagnostic suite meets predefined correctness and unsupported-claim limits; evidence references are valid; monitoring remains available during inference failure and budget exhaustion.
+## T3 — Verified recovery
 
-## T3 — Explicitly permitted recovery
+| Work package | Feature and boundaries | Acceptance evidence |
+|---|---|---|
+| T3.1 Preview and approval | First procedure is restart of one explicitly registered noncritical systemd service. Show exact target, revision, preconditions, effect, verification probe, retry budget and failure handling. Bind approval to actor, device, procedure revision, arguments and expiry. Validate typed arguments. Acquire authorization from the local operator and trusted policy. | Reject stale, replayed, edited and unauthorized approvals, lookalike unit names, arguments outside the registry and suggestions from log or model text. Preview causes zero mutations. |
+| T3.2 Narrow executor and durable audit | Separate privileged executor with explicit identity and action policy. Deduplicate and lock actions per target. Write an intent before the effect and record dispatch, outcome, independently observed verification and rollback eligibility. Reconcile an ambiguous result after a crash before any new attempt. A healthy service and its functional probe must pass. A failed restart escalates to the operator when no rollback is defined. | Fake executor proves authorization, retry and race behavior. Authorized disposable service trials show that an exit-zero action with a failed probe remains unverified. Crash after dispatch does not issue a second restart blindly. Audit-full and verification failures are visible. |
+| T3.3 Guarded automatic recovery | Only after T3.2 pilot evidence, allow individual noncritical procedures to opt into trusted local policy with a maintenance window, per-target rate limit, circuit breaker and kill switch. Evaluate rollback only for procedures with a known previous state, such as restoring a specific managed config or pinning a known-good release through its updater. | Exercise repeated failures, offline/reboot behavior, concurrent actions and kill switch revocation. Compare verified outcome, operator time and unintended effects against manual/systemd-only handling. Default stays operator approval. |
 
-Add a small registry of maintenance procedures with typed arguments, permissions, preconditions, retry/rate limits, verification and audit records. Start with operator-approved actions; consider automatic recovery only for individually enabled procedures after validation. Implement a narrow privilege boundary before claiming safe autonomous administration.
+## T4 — Local API, portal and support workflow
 
-Exit: permitted repairs succeed on defined fault scenarios; forbidden/unsupported actions are rejected; verification distinguishes repair from command completion; rollback/failure behavior and repeated-fault handling are demonstrated.
+| Work package | Feature and boundaries | Acceptance evidence |
+|---|---|---|
+| T4.1 Versioned local reads | Serve device identity, current observations, findings, evidence, budget and read-only action outcomes. Use a local socket by default, with documented version negotiation, bounded pagination, retention, response sizes and explicit stale/error states. If served over a network, require an approved TLS and auth path with explicit audience and roles. | Contract fixtures and API tests cover invalid requests, untrusted fields, staleness, caller isolation and cap enforcement. Verify remote access is disabled by default. |
+| T4.2 Optional web portal | Show summary, stale/offline state, incident timeline, evidence references, explanation status and action outcomes. Render untrusted text as data. Export a bounded, redacted support bundle with an evidence manifest and preview. Provide keyboard-accessible workflows and keep the CLI usable without the portal. | Walk through discovery of a failed gateway dependency with and without a model. Check accessibility, content injection, export redaction and footprint with portal enabled and disabled. |
+| T4.3 Authorized actions | Preview, approve, cancel where supported and track a procedure using T3 authority. Separate viewer, operator and policy administrator roles. Bound mutation requests and queue depth. Record idempotency keys and audit actor identity. | Concurrent and repeated requests cause at most one effect per idempotency key. Expired approval, revoked roles and cross-device requests fail at execution. Distinguish requested cancellation, canceled and verified outcomes. |
 
-## T4 — API and web portal
+## T5 — Optional adapters
 
-Expose device state, findings, evidence, budgets, proposed procedures and action outcomes. Include authentication/authorization, bounded inputs, cancellation and audit for mutation. Keep the portal optional for headless use. Define endpoints and UI flows in a milestone design before implementation.
+Each adapter declares which data it reads, what it sends, permissions, peak and idle overhead, offline behavior, rate limits, retention and an owner. Disabled adapters start no child and send no traffic. Keep a fixture contract with representative source versions and explicitly record rejected inputs. Sequence the first adapter by pilot demand.
 
-Exit: operators can diagnose and authorize supported actions through a consistent API; access boundaries hold; whole-system footprint remains within the declared target.
+| Work package | Feature and boundaries | Acceptance evidence |
+|---|---|---|
+| T5.1 Telemetry and notifications | Export low-cardinality Prometheus metrics, stable finding IDs and event JSON. Send one opt-in outgoing webhook before adding Slack, email or PagerDuty delivery. Use deduplication, maintenance windows, bounded retries and a queue TTL. Integrate OpenTelemetry or Grafana Alloy only where the operator already needs it. | Simulate duplicate events, stale transitions, webhook outage and recovery. Verify backpressure, explicit drops, redaction and no monitoring dependency on remote delivery. |
+| T5.2 Functional and hardware checks | Add bounded, configured HTTP/TCP or local MQTT probes, certificate-expiry and backup freshness checks, and optional heartbeat export. Evaluate one opt-in sensor adapter for SMART/storage or UPS state. Use explicit target allowlists and privileges. Keep broad scraping, arbitrary probe scripts and power control outside this package. | Detect an active-but-unhealthy service in fixtures. Distinguish endpoint failure from missing connectivity. Verify probe timeout, expired certificate, missed backup and missing sensor behavior without outbound scans. |
+| T5.3 Security-event import | Import Falco JSON first, then consider Wazuh or audit/journal sources. Normalize origin, rule, time and severity, retain bounded evidence and deduplicate. Explain observed events and confidence in context. The integration consumes upstream alerts and has no authority to block, quarantine or change network policy. | Measure parser coverage, rejected/lost events, duplicate handling, false correlations and explanation quality on labeled examples. Attribute upstream detector misses and false positives separately from TUMe interpretation errors. |
+| T5.4 Update and backup readiness | Read deployed versions and OTA status from one existing Mender or balena deployment. Surface preflight health, available disk, backup freshness, current and target versions, and post-update functional checks. Integrate vendor rollback status where available. Keep OS image delivery with the updater. | Test stale versions, interrupted downloads, a failed post-update probe and vendor-reported rollback. A release is healthy only when the expected version and functional probe agree. |
 
-## T5 — Security-event and maintenance adapters
+## T6 — Fleet, connectivity and support
 
-Evaluate integration with existing event/security tools and update systems rather than building every detector or updater. Begin with read-only event import and explanation. Measure false positives, missed labeled events and diagnostic usefulness before making cyberattack-detection claims. Updates and network-policy changes need separately scoped procedures and authorization.
+| Work package | Feature and boundaries | Acceptance evidence |
+|---|---|---|
+| T6.1 Device identity and offline sync | Enroll using short-lived claims and per-device credentials with rotation and revocation. Use an outbound transport with bounded, durable store-and-forward for findings and health. Carry sequence and boot identity, deduplicate replay, mark lost ranges and distinguish last seen from current health. Reuse an operator's fleet transport where it fits. | Simulate enrollment theft/replay, offline queue overflow, clock skew, duplicate delivery and revocation. Verify bounded growth, restart-safe reconciliation and tenant isolation. |
+| T6.2 Fleet views and support | Group devices by tenant, site, profile and software version. Show stale devices, trends, alert status and audit history. Export redacted evidence across authorized scopes. Link to an approved external access system for operator troubleshooting. Pilot with gateways first, then signage or remote stations when functional checks exist. | Test role/tenant matrix across every route, compare freshness under a partition and measure ingestion, query latency, support time and gateway overhead at the agreed device count. |
+| T6.3 Staged maintenance | If needed, layer health gates, maintenance windows, approvals and canary progression over one vendor updater. Use pre/post health and release identity to pause a rollout. Approve rollback explicitly unless a reviewed policy for that precise operation permits it. Use signed release artifacts and retain provenance. | A failing canary pauses promotion. An offline device cannot be counted as verified. Test expired permissions, unsupported rollback and interrupted rollout recovery. Start with a limited pilot group. |
 
-Exit: each adapter has a documented input contract, permissions, bounded overhead, failure behavior and an evaluated operator use case.
+## Release and evidence rules
 
-## T6 — Fleet and selected integrations
-
-Add only validated needs: device enrollment/identity, fleet views, notification channels or update orchestration. Keep connectors opt-in and account for their child processes and persistent storage. General assistant feature parity is not a completion criterion.
-
-Exit: the supported device/workload scale, authorization boundaries, failure recovery and total resource budgets are measured and documented.
-
-## Cross-cutting acceptance
-
-- Count the full footprint: controller, collectors, models, adapters, isolation and persistent state. Report idle and active operation separately.
-- Report correct diagnoses/repairs, false/unsupported recommendations, refusals, resource violations, end-to-end latency and availability of the protected workload.
-- Monitoring and deterministic emergency policies work without an LLM. Operational authority comes from explicit policy, not generated text.
-- No physical Pi validation, security accuracy, continuous supervision or product RAM target is yet established by inherited inference benchmarks.
-- Feature implementation requires its own design and verification; the current setup does not start those milestones or run new experiments.
+- Track controller, helpers, integrations, inference, cgroup and host effects, persistent data, I/O, network and protected workload latency/availability. Report idle, active and degraded operation separately. Include device, workload, configuration, sample sizes and failure cases.
+- Keep core monitoring functional offline without a model. Keep untrusted data and generated text outside the authorization boundary. Explicit policy governs actions, retries, verification and audit.
+- Before broader distribution, resolve the repository licensing decision, review inherited and integration dependencies, document install, upgrade, removal and compatibility, and establish artifact integrity and provenance. The inherited research names stay until a deliberate migration.
+- Run workload and inference experiments only with authorization appropriate to the device and test. Upstream inference measurements guide investigation and do not establish product performance, diagnosis accuracy or recovery safety. Publish sanitized evidence and preserve source revisions.
+- Revisit the roadmap after T1 with pilot operators. Advance a feature when it improves a measured workflow within the declared resource budget. General assistant features, a replacement telemetry platform, custom OTA infrastructure, arbitrary shell access and autonomous fleet-wide changes are outside this plan.
