@@ -35,6 +35,13 @@ pub const Value = struct {
 
 pub const Observation = struct { key: []const u8, value: ?Value, reason: ?types.Reason };
 
+pub const Streak = struct {
+    rule_id: findings.RuleId,
+    subject: []const u8,
+    breach: u2,
+    recovery: u2,
+};
+
 pub const Wire = struct {
     schema_version: u16 = version,
     mode: Mode,
@@ -45,6 +52,24 @@ pub const Wire = struct {
     target: types.Target,
     observations: []const Observation,
     findings: []const findings.Finding,
+    streaks: ?[]const Streak = null,
+
+    pub fn jsonStringify(self: Wire, writer: *std.json.Stringify) !void {
+        try writer.beginObject();
+        inline for (@typeInfo(Wire).@"struct".fields) |field| {
+            const value = @field(self, field.name);
+            if (comptime std.mem.eql(u8, field.name, "streaks")) {
+                if (value != null) {
+                    try writer.objectField(field.name);
+                    try writer.write(value);
+                }
+            } else {
+                try writer.objectField(field.name);
+                try writer.write(value);
+            }
+        }
+        try writer.endObject();
+    }
 };
 
 fn observation(key: []const u8, reading: anytype) Observation {

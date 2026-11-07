@@ -100,14 +100,7 @@ pub fn stamp() !types.Stamp {
         .value => |data| std.mem.trimEnd(u8, data, "\n"),
         .reason => return error.ClockUnavailable,
     };
-    if (boot_id.len != 36) return error.ClockUnavailable;
-    for (boot_id, 0..) |byte, i| {
-        const valid = switch (i) {
-            8, 13, 18, 23 => byte == '-',
-            else => std.ascii.isDigit(byte) or (byte >= 'a' and byte <= 'f'),
-        };
-        if (!valid) return error.ClockUnavailable;
-    }
+    if (!types.validBootId(boot_id)) return error.ClockUnavailable;
     const real = std.posix.clock_gettime(.REALTIME) catch return error.ClockUnavailable;
     return .{
         .boot_id = boot_id[0..36].*,

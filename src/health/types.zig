@@ -1,3 +1,5 @@
+const std = @import("std");
+
 pub const Target = struct {
     mount: []const u8,
     services: []const []const u8,
@@ -26,3 +28,15 @@ pub const Sample = struct {
     services: []const Service,
     temperature_mc: ?Reading(i32),
 };
+
+pub fn validBootId(id: []const u8) bool {
+    if (id.len != 36) return false;
+    for (id, 0..) |byte, i| {
+        const valid = switch (i) {
+            8, 13, 18, 23 => byte == '-',
+            else => std.ascii.isDigit(byte) or (byte >= 'a' and byte <= 'f'),
+        };
+        if (!valid) return false;
+    }
+    return true;
+}

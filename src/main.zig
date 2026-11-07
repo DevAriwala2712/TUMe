@@ -19,7 +19,7 @@ fn printUsage() void {
             "  nanoclaw-next run [--prompt TEXT | --interactive]\n" ++
             "  nanoclaw-next prompt                    interactive run\n" ++
             "  nanoclaw-next selftest                  model-free checks for this device\n" ++
-            "  nanoclaw-next health snapshot --config PATH   Linux health snapshot\n" ++
+            "  nanoclaw-next health {{snapshot|watch|status}} --config PATH   Linux device health\n" ++
             "\n" ++
             "Request flags:\n" ++
             "  --ctx N --min-ctx N --tokens N --deadline-ms N --sensitive\n" ++
