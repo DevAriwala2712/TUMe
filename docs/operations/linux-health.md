@@ -44,6 +44,8 @@ Exit 0 means the report is fresh, including when it contains findings or unavail
 
 Edit `/etc/tume/health.json` with administrative access and run `sudo systemctl restart tume-health.service` to apply it. If a watcher cannot publish, inspect `sudo journalctl -u tume-health.service` and the free space and ownership of the state directory.
 
+For a designated test installation, run the [native smoke checklist](t1-native-smoke.md) to verify the unit, report freshness and process cleanup.
+
 ## Stop or remove
 
 ```sh

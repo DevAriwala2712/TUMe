@@ -6,7 +6,7 @@
 
 - Model-free Zig fixture tests cover config validation, parsing, thresholds, probe lifecycle, JSON, restart cadence, atomic replacement and freshness.
 - The CLI and test binaries cross-compile for Linux arm64 and x86_64. The macOS CLI smoke test checks the explicit Linux-only health response.
-- Native Linux probe tests and the systemd install, status and stop checks are pending. Cross-compilation establishes target compatibility at build time.
+- Native Linux probe tests and the systemd install, status and stop checks are pending. Cross-compilation establishes target compatibility at build time. The [native smoke checklist](../operations/t1-native-smoke.md) records the commands and expected outcomes.
 
 ## Remaining acceptance
 
