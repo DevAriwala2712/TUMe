@@ -1,0 +1,6 @@
+{
+  "mount": "/",
+  "services": [],
+  "thermal_zone": null,
+  "state_dir": "/var/lib/tume"
+}

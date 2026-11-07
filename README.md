@@ -1,10 +1,10 @@
 # TUMe
 
-**A planned lightweight maintenance supervisor for Linux edge devices.**
+**A maintenance supervisor in development for Linux edge devices.**
 
 TUMe aims to observe device health, protect the main workload from resource pressure, explain faults using evidence, and eventually perform explicitly permitted recovery procedures. Local LLM inference is an optional, budgeted capability; monitoring must remain useful when no model can run.
 
-**Status: product incubation.** This repository preserves NanoClaw-Next's existing research runtime and Git history. The TUMe maintenance daemon, health collectors, incident diagnosis, recovery procedures, HTTP API, web portal and integrations are **not implemented yet**. No TUMe product performance, security-detection accuracy or unattended-recovery results are claimed.
+**Status: product incubation.** T1 implements read-only Linux health snapshots, a local watcher and deterministic findings. Linux deployment and the physical-device pilot are pending. Diagnosis, recovery, an HTTP API, a portal and integrations remain planned.
 
 ## Two repositories, two goals
 
@@ -23,12 +23,24 @@ The inherited Zig CLI can read memory and GGUF model metadata, estimate resource
 |---|---|
 | Memory snapshots, model estimates, scheduler, calibration, research benchmark CLI | Inherited implementation; see the [historical runtime README](README.nanoclaw-next.md) |
 | Allowlisted command execution and hard timeout | Inherited experimental path; commands run with the user's permissions, not kernel isolation |
-| Continuous device/service health monitoring and incident records | Planned |
+| Linux device/service snapshots, watcher and latest findings | T1 implementation. See the [operator guide](docs/operations/linux-health.md) and [validation status](docs/evidence/T1-linux-health.md). |
+| Incident history and evidence timelines | Planned |
 | On-demand diagnosis grounded in logs and telemetry | Planned |
 | Bounded recovery procedures, permissions, auditing and rollback | Planned |
 | HTTP API and web portal | Planned |
 | Security-event adapters and suspicious-activity explanations | Planned; not a validated cyberattack detector |
 | Fleet, messaging and maintenance/update integrations | Later candidates, not current features |
+
+## Run local health checks
+
+On Linux with Zig 0.15.2, build the binary and take a snapshot with the sample configuration.
+
+```sh
+zig build -Doptimize=ReleaseSmall
+./zig-out/bin/nanoclaw-next health snapshot --config deploy/systemd/health.example.json
+```
+
+See the [operator guide](docs/operations/linux-health.md) for systemd deployment, status, and configuration.
 
 ## Intended operating model
 
@@ -58,4 +70,4 @@ Model paths and a backend command must be configured to plan real candidates. Th
 
 Inherited benchmark reports concern NanoClaw-Next's inference experiments. Their 54-run memory grid and earlier cgroup OOM comparison do not measure a maintenance daemon, attack detection, diagnosis correctness or full-system overhead. See [benchmark provenance](docs/benchmarks/README.md).
 
-The first implementation milestone is a read-only Linux health snapshot and findings pipeline with bounded collection overhead. Feature breadth follows validated usefulness and a declared total memory budget; see [docs/PLAN.md](docs/PLAN.md).
+The next milestone gate is a Linux deployment smoke test and a physical-device pilot measuring findings, whole-service overhead and broker performance. See the [product roadmap](docs/PLAN.md).
