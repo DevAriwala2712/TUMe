@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "backend": "/usr/local/libexec/tume-llama-explain",
+  "job_cgroup": "/sys/fs/cgroup/tume-diagnostic/job",
+  "measured_peak_bytes": 536870912,
+  "reserve_bytes": 268435456,
+  "timeout_ms": 15000,
+  "max_output_bytes": 4096,
+  "max_tokens": 128
+}

@@ -5,6 +5,8 @@ const findings = @import("findings.zig");
 const probe = @import("probe.zig");
 const state = @import("state.zig");
 const types = @import("types.zig");
+const history = @import("../incident/writer.zig");
+const timeline = @import("../incident/timeline.zig");
 
 const interval_ms = 15000;
 const warning_interval_ms = 300000;
@@ -86,26 +88,51 @@ pub fn run(allocator: std.mem.Allocator, config: types.Config, once: bool) !void
     var runner: probe.Runner = .{ .canceled = flag };
     defer runner.stop();
     var last_warning: ?u64 = null;
+    const history_enabled = !once and config.history.enabled;
+    var writer: history.Writer = .{};
+    defer if (history_enabled) writer.stop();
+    var prior_evaluable: [7]bool = @splat(false);
     while (flag.* == 0) {
         const now = try collect.bootMillis();
+        if (history_enabled) writer.poll(now);
         if (cadence(cursor.previous, now) == .skip) {
             if (once) return;
             // Bound the gap if a stop signal arrives just before entering sleep.
-            try waitUntil(@min(cursor.previous.? +| interval_ms, now +| 250));
+            const delay: u64 = if (history_enabled and writer.waiting()) 20 else 250;
+            try waitUntil(@min(cursor.previous.? +| interval_ms, now +| delay));
             continue;
         }
         _ = arena.reset(.free_all);
         const a = arena.allocator();
+        const monotonic = if (history_enabled and config.history.journal_metadata) history.monotonicMicros() else null;
         const sampled = try collect.stamp();
         const sample = try collect.take(a, config.target, sampled, &runner);
         if (flag.* != 0) return;
-        _ = cursor.publish(a, &store, config.target, sample) catch |err| {
+        const before = cursor.confirmed;
+        const missed = cadence(cursor.previous, sampled.boot_ms) == .sample_reset;
+        const published = cursor.publish(a, &store, config.target, sample) catch |err| failed: {
             if (once or cursor.previous != sampled.boot_ms) return err;
+            if (history_enabled) writer.breakContinuity(.status_publish_failed);
             if (last_warning == null or sampled.boot_ms -| last_warning.? >= warning_interval_ms) {
                 std.debug.print("health publish: {s}\n", .{@errorName(err)});
                 last_warning = sampled.boot_ms;
             }
+            break :failed false;
         };
+        if (history_enabled and published) {
+            if (missed) writer.breakContinuity(.missed_tick);
+            writer.submit(store.dir, .{
+                .target = config.target,
+                .agent_release = history.agent_release,
+                .workload_release = config.history.workload_release,
+                .sample = sample,
+                .before = before,
+                .after = cursor.confirmed,
+                .prior_evaluable = prior_evaluable,
+                .monotonic_us = monotonic,
+            });
+            prior_evaluable = timeline.evaluable(sample);
+        }
         if (once) return;
     }
 }

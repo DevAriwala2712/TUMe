@@ -1,0 +1,4 @@
+# Install with visudo validation only after creating the dedicated operator group.
+Cmnd_Alias TUME_RECOVERY = /usr/local/libexec/tume-recovery-executor
+Defaults!TUME_RECOVERY env_reset, use_pty, requiretty, timestamp_timeout=0
+%tume-recovery-operators ALL=(root:root) PASSWD: NOSETENV: TUME_RECOVERY

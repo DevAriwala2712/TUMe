@@ -14,3 +14,15 @@ test {
 test {
     _ = @import("health/tests.zig");
 }
+
+test {
+    _ = @import("diagnostic/explanation.zig");
+    _ = @import("diagnostic/policy.zig");
+    _ = @import("diagnostic/runner.zig");
+    _ = @import("diagnostic/admission.zig");
+    _ = @import("incident/tests.zig");
+}
+
+test {
+    _ = @import("recovery/tests.zig");
+}

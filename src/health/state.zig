@@ -25,10 +25,10 @@ pub const Loaded = struct {
 
 const latest = "latest.json";
 const temporary = ".latest.tmp";
-const private_read: posix.O = .{ .CLOEXEC = true, .NOFOLLOW = true, .NONBLOCK = true };
+pub const private_read: posix.O = .{ .CLOEXEC = true, .NOFOLLOW = true, .NONBLOCK = true };
 
 pub const SyncPhase = enum { file, directory };
-fn syncFd(fd: posix.fd_t, _: SyncPhase) !void {
+pub fn syncFd(fd: posix.fd_t, _: SyncPhase) !void {
     try posix.fsync(fd);
 }
 
@@ -53,7 +53,7 @@ pub const Store = struct {
         return .{ .dir = dir };
     }
 
-    fn validateFile(fd: posix.fd_t, allow_unlinked: bool) !void {
+    pub fn validateFile(fd: posix.fd_t, allow_unlinked: bool) !void {
         const stat = try posix.fstat(fd);
         if (!posix.S.ISREG(stat.mode) or stat.uid != posix.geteuid() or
             stat.mode & 0o7777 != 0o600 or stat.nlink > 1 or
@@ -75,7 +75,7 @@ pub const Store = struct {
         self.writer_lock = fd;
     }
 
-    fn openPrivate(self: *Store, name: []const u8, allow_unlinked: bool) !std.fs.File {
+    pub fn openPrivate(self: *Store, name: []const u8, allow_unlinked: bool) !std.fs.File {
         const fd = try posix.openat(self.dir, name, private_read, 0);
         errdefer posix.close(fd);
         try validateFile(fd, allow_unlinked);
@@ -96,7 +96,7 @@ pub const Store = struct {
         return decode(a, bytes[0..n], target, checked_at);
     }
 
-    fn checkedExisting(self: *Store, name: []const u8) !bool {
+    pub fn checkedExisting(self: *Store, name: []const u8) !bool {
         const file = self.openPrivate(name, false) catch |err| switch (err) {
             error.FileNotFound => return false,
             else => return err,

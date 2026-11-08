@@ -7,9 +7,10 @@ const Wire = struct {
     services: [][]const u8 = &.{},
     thermal_zone: std.json.Value = .null,
     state_dir: ?[]const u8 = null,
+    history: types.HistoryConfig = .{},
 };
 
-fn validPath(path: []const u8) bool {
+pub fn validPath(path: []const u8) bool {
     if (path.len == 0 or path.len > 256 or path[0] != '/') return false;
     if (path.len == 1) return true;
     for (path) |c| if (c < 32 or c == 127) return false;
@@ -20,13 +21,24 @@ fn validPath(path: []const u8) bool {
     return true;
 }
 
-fn validUnit(unit: []const u8) bool {
+pub fn validUnit(unit: []const u8) bool {
     if (unit.len <= ".service".len or unit.len > 128 or unit[0] == '-' or
         !std.mem.endsWith(u8, unit, ".service")) return false;
     for (unit) |c| {
         if (!std.ascii.isAlphanumeric(c) and std.mem.indexOfScalar(u8, "_.@-", c) == null) return false;
     }
     return true;
+}
+
+pub fn validRelease(release: []const u8) bool {
+    var parts = std.mem.splitScalar(u8, release, '.');
+    for (0..3) |_| {
+        const part = parts.next() orelse return false;
+        if (part.len == 0 or part.len > 5 or (part.len > 1 and part[0] == '0')) return false;
+        for (part) |c| if (!std.ascii.isDigit(c)) return false;
+        _ = std.fmt.parseInt(u16, part, 10) catch return false;
+    }
+    return parts.next() == null;
 }
 
 fn lessThan(_: void, a: []const u8, b: []const u8) bool {
@@ -61,9 +73,16 @@ pub fn parse(allocator: std.mem.Allocator, bytes: []const u8) !types.Config {
         .integer => |n| if (n >= 0 and n <= 255) @intCast(n) else return error.InvalidConfig,
         else => return error.InvalidConfig,
     };
+    if (!wire.history.enabled and (wire.history.journal_metadata or wire.history.workload_release != null))
+        return error.InvalidConfig;
+    if (wire.history.workload_release) |release| {
+        if (!validRelease(release)) return error.InvalidConfig;
+    }
+    if (wire.history.enabled and !std.unicode.utf8ValidateSlice(wire.mount)) return error.InvalidConfig;
     return .{
         .target = .{ .mount = wire.mount, .services = wire.services, .thermal_zone = zone },
         .state_dir = wire.state_dir,
+        .history = wire.history,
     };
 }
 

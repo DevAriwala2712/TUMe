@@ -1,0 +1,16 @@
+[Unit]
+Description=TUMe guarded recovery for the disposable demo
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/libexec/tume-recovery-automatic
+User=root
+Group=root
+UMask=0077
+NoNewPrivileges=yes
+ProtectSystem=strict
+ReadWritePaths=/var/lib/tume-recovery
+ProtectHome=yes
+PrivateTmp=yes
+RestrictAddressFamilies=AF_UNIX
+TimeoutStartSec=20s

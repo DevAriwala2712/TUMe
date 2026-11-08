@@ -1,0 +1,8 @@
+[Unit]
+Description=TUMe disposable recovery polling for the current boot
+
+[Timer]
+OnActiveSec=1s
+OnUnitInactiveSec=15s
+AccuracySec=1s
+Unit=tume-recovery-automatic.service

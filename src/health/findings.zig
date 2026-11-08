@@ -19,7 +19,7 @@ pub const Entry = struct {
 
 pub const State = struct { entries: [7]Entry = @splat(.{}) };
 
-const Verdict = enum { breach, recovery, deadband, unknown };
+pub const Verdict = enum { breach, recovery, deadband, unknown };
 
 pub fn resetStreaks(state: *State) void {
     for (&state.entries) |*entry| {
@@ -46,27 +46,43 @@ pub fn evidenceKey(a: std.mem.Allocator, key: Key) ![]const u8 {
     };
 }
 
+pub fn diskVerdict(used_bp: u16) Verdict {
+    return if (used_bp >= 9000) .breach else if (used_bp <= 8500) .recovery else .deadband;
+}
+
+pub fn memoryVerdict(available_bytes: u64) Verdict {
+    return if (available_bytes < 128 << 20) .breach else if (available_bytes >= 160 << 20) .recovery else .deadband;
+}
+
+pub fn stallVerdict(pressure_bp: u16) Verdict {
+    return if (pressure_bp >= 1000) .breach else if (pressure_bp < 500) .recovery else .deadband;
+}
+
+pub fn serviceVerdict(active: types.ActiveState) Verdict {
+    return switch (active) {
+        .failed, .inactive => .breach,
+        .active => .recovery,
+        .activating, .deactivating, .reloading => .unknown,
+    };
+}
+
 fn verdictAt(sample: types.Sample, i: usize) Verdict {
     return switch (i) {
         0 => switch (sample.disk_used_bp) {
             .reason => .unknown,
-            .value => |used| if (used >= 9000) .breach else if (used <= 8500) .recovery else .deadband,
+            .value => |used| diskVerdict(used),
         },
         1 => switch (sample.memory) {
             .reason => .unknown,
-            .value => |memory| if (memory.available_bytes < 128 << 20) .breach else if (memory.available_bytes >= 160 << 20) .recovery else .deadband,
+            .value => |memory| memoryVerdict(memory.available_bytes),
         },
         2 => switch (sample.memory_psi_bp) {
             .reason => .unknown,
-            .value => |pressure| if (pressure >= 1000) .breach else if (pressure < 500) .recovery else .deadband,
+            .value => |pressure| stallVerdict(pressure),
         },
         else => switch (sample.services[i - 3].state) {
             .reason => .unknown,
-            .value => |value| switch (value) {
-                .failed, .inactive => .breach,
-                .active => .recovery,
-                .activating, .deactivating, .reloading => .unknown,
-            },
+            .value => |active| serviceVerdict(active),
         },
     };
 }

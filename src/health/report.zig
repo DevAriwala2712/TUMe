@@ -72,7 +72,7 @@ pub const Wire = struct {
     }
 };
 
-fn observation(key: []const u8, reading: anytype) Observation {
+pub fn observation(key: []const u8, reading: anytype) Observation {
     return switch (reading) {
         .reason => |reason| .{ .key = key, .value = null, .reason = reason },
         .value => |value| .{
