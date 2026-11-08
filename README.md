@@ -4,7 +4,7 @@
 
 TUMe aims to observe device health, protect the main workload from resource pressure, explain faults using evidence, and eventually perform explicitly permitted recovery procedures. Local LLM inference is an optional, budgeted capability; monitoring must remain useful when no model can run.
 
-**Status: product incubation.** T1 implements read-only Linux health snapshots, a local watcher and deterministic findings. Linux deployment and the physical-device pilot are pending. Diagnosis, recovery, an HTTP API, a portal and integrations remain planned.
+**Status: product incubation.** T1 implements read-only Linux health snapshots, a local watcher and deterministic findings. The arm64 Linux VM deployment smoke passed. The x86_64 native smoke and physical-device pilot are pending. T2 adds local incident history, deterministic next checks and an optional diagnostic job. Model-free diagnostic smoke passed on the arm64 Linux VM. Held-out model evaluation and workload measurements are pending. Recovery, an HTTP API, a portal and integrations remain planned.
 
 ## Two repositories, two goals
 
@@ -24,8 +24,8 @@ The inherited Zig CLI can read memory and GGUF model metadata, estimate resource
 | Memory snapshots, model estimates, scheduler, calibration, research benchmark CLI | Inherited implementation; see the [historical runtime README](README.nanoclaw-next.md) |
 | Allowlisted command execution and hard timeout | Inherited experimental path; commands run with the user's permissions, not kernel isolation |
 | Linux device/service snapshots, watcher and latest findings | T1 implementation. See the [operator guide](docs/operations/linux-health.md) and [validation status](docs/evidence/T1-linux-health.md). |
-| Incident history and evidence timelines | Planned |
-| On-demand diagnosis grounded in logs and telemetry | Planned |
+| Incident history and evidence timelines | Optional local history and deterministic next checks. See the [incident guide](docs/operations/incident-history.md). |
+| On-demand diagnosis | Optional cgroup-bounded explanations from fresh T1 observations. See the [explanation guide](docs/operations/grounded-explanations.md) and [validation status](docs/evidence/T2-diagnosis.md). |
 | Bounded recovery procedures, permissions, auditing and rollback | Planned |
 | HTTP API and web portal | Planned |
 | Security-event adapters and suspicious-activity explanations | Planned; not a validated cyberattack detector |

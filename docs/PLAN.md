@@ -1,8 +1,8 @@
 # TUMe product roadmap
 
-Updated 2026-11-07. TUMe is in product incubation. The inherited NanoClaw-Next CLI supplies research memory probing, scheduling, calibration and llama.cpp integration. T1 code is implemented with Linux deployment and pilot validation pending. T2–T6 remain proposed. The [market review](MARKET.md) maps existing products and potential deployments to TUMe's build, integrate and defer decisions. The [research plan](RESEARCH_PLAN.md) records upstream work.
+Updated 2026-11-08. TUMe is in product incubation. The inherited NanoClaw-Next CLI supplies research memory probing, scheduling, calibration and llama.cpp integration. T1 code is implemented and passed the arm64 Linux VM smoke. The x86_64 native smoke and physical-device pilot remain pending. T2 implements local history and optional diagnostics and passed model-free arm64 Linux VM smoke checks. Held-out model evaluation and workload measurements remain pending. T3–T6 remain proposed. The [market review](MARKET.md) maps existing products and potential deployments to TUMe's build, integrate and defer decisions. The [research plan](RESEARCH_PLAN.md) records upstream work.
 
-**Next gate.** Run the Linux installation smoke test and the authorized Pi pilot. See the [T1 design](superpowers/specs/2026-11-07-linux-health-design.md) and [implementation plan](superpowers/plans/2026-11-07-linux-health.md) for the implemented scope. The proposed pilot is one Raspberry Pi 4 Model B with 2 GiB RAM running a Mosquitto gateway workload. T1 gives an operator a local read-only snapshot and sustained findings with no network or model. Test whether the evidence and resource profile are worth adding to a gateway that could already use systemd and Monit. Measure against Netdata where the configurations are comparable. Confirm the hardware, workload and gates before treating that setup as the product target.
+**Next T1 gate.** Run the x86_64 installation smoke test and the physical Pi pilot. See the [T1 design](superpowers/specs/2026-11-07-linux-health-design.md) and [implementation plan](superpowers/plans/2026-11-07-linux-health.md) for the implemented scope. The proposed pilot is one Raspberry Pi 4 Model B with 2 GiB RAM running a Mosquitto gateway workload. T1 gives an operator a local read-only snapshot and sustained findings with no network or model. Test whether the evidence and resource profile are worth adding to a gateway that could already use systemd and Monit. Measure against Netdata where the configurations are comparable. Confirm the hardware, workload and gates before treating that setup as the product target.
 
 ## Release sequence
 
@@ -28,6 +28,8 @@ The [earlier v0.1 draft](SPEC_DIRECTION_AND_V01.md) sketches a broader collector
 - **Exit.** Correct fixture outcomes across all rules, an x86_64 Linux smoke test and a physical Pi run without network or model. Proposed pilot limits include 16 MiB p95 service cgroup memory, 32 MiB peak, average CPU at most 1% of one core and zero broker delivery loss or OOM kills. See the [design and pilot protocol](superpowers/specs/2026-11-07-linux-health-design.md).
 
 ## T2 — Diagnosis without compromising the workload
+
+See the [T2 evidence record](evidence/T2-diagnosis.md) for implementation checks and outstanding acceptance.
 
 The [T2.1 design draft](superpowers/specs/2026-11-07-incident-timeline-design.md) covers local incident history, optional journal metadata and deterministic next checks.
 

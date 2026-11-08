@@ -6,7 +6,17 @@ pub const Target = struct {
     thermal_zone: ?u8,
 };
 
-pub const Config = struct { target: Target, state_dir: ?[]const u8 };
+pub const HistoryConfig = struct {
+    enabled: bool = false,
+    journal_metadata: bool = false,
+    workload_release: ?[]const u8 = null,
+};
+
+pub const Config = struct {
+    target: Target,
+    state_dir: ?[]const u8,
+    history: HistoryConfig = .{},
+};
 pub const Stamp = struct { boot_id: [36]u8, unix_ms: i64, boot_ms: u64 };
 pub const Reason = enum { unsupported, denied, unavailable, invalid, timeout, truncated };
 

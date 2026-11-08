@@ -20,7 +20,7 @@ fn arguments(args: []const []const u8) !Args {
     return .{ .mode = mode, .config_path = args[2], .once = once };
 }
 
-fn readConfig(a: std.mem.Allocator, path: []const u8) !types.Config {
+pub fn readConfig(a: std.mem.Allocator, path: []const u8) !types.Config {
     const fd = try std.posix.open(path, .{ .CLOEXEC = true, .NONBLOCK = true }, 0);
     const file: std.fs.File = .{ .handle = fd };
     defer file.close();
@@ -59,7 +59,7 @@ pub fn statusResponse(a: std.mem.Allocator, loaded: state.Loaded) !StatusRespons
     };
 }
 
-fn loadStatus(a: std.mem.Allocator, loaded: types.Config) state.Loaded {
+pub fn loadStatus(a: std.mem.Allocator, loaded: types.Config) state.Loaded {
     var store = state.Store.open(loaded.state_dir.?) catch |err| return .{
         .freshness = if (err == error.FileNotFound) .absent else .unavailable,
     };

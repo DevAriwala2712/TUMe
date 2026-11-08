@@ -19,20 +19,24 @@ pub const Child = struct {
 };
 
 pub const DrainError = error{ OutputLimit, ProbeFailure };
-pub const Capture = struct {
-    stdout: [4096]u8 = undefined,
-    stdout_len: usize = 0,
-    total: usize = 0,
+pub const Capture = CaptureBuffer(4096);
 
-    pub fn add(self: *Capture, bytes: []const u8, stdout: bool) DrainError!void {
-        if (bytes.len > self.stdout.len - self.total) return error.OutputLimit;
-        self.total += bytes.len;
-        if (stdout) {
-            @memcpy(self.stdout[self.stdout_len..][0..bytes.len], bytes);
-            self.stdout_len += bytes.len;
+fn CaptureBuffer(comptime capacity: usize) type {
+    return struct {
+        stdout: [capacity]u8 = undefined,
+        stdout_len: usize = 0,
+        total: usize = 0,
+
+        pub fn add(self: *@This(), bytes: []const u8, stdout: bool) DrainError!void {
+            if (bytes.len > self.stdout.len - self.total) return error.OutputLimit;
+            self.total += bytes.len;
+            if (stdout) {
+                @memcpy(self.stdout[self.stdout_len..][0..bytes.len], bytes);
+                self.stdout_len += bytes.len;
+            }
         }
-    }
-};
+    };
+}
 
 const Operations = struct {
     ctx: ?*anyopaque = null,
@@ -315,7 +319,7 @@ fn pipe() ![2]posix.fd_t {
     return fds;
 }
 
-fn spawn(req: Request, comptime work: fn (Request) u8) !Child {
+fn spawn(req: anytype, comptime work: fn (@TypeOf(req)) u8) !Child {
     const out = try pipe();
     errdefer posix.close(out[0]);
     defer posix.close(out[1]);
@@ -337,6 +341,10 @@ fn spawn(req: Request, comptime work: fn (Request) u8) !Child {
 }
 
 fn nativeDrain(_: ?*anyopaque, child: *Child, capture: *Capture, delay: u16) DrainError!void {
+    return drain(child, capture, delay);
+}
+
+fn drain(child: *Child, capture: anytype, delay: u16) DrainError!void {
     if (builtin.os.tag != .linux) return error.ProbeFailure;
     var fds = [_]posix.pollfd{
         .{ .fd = child.out, .events = posix.POLL.IN, .revents = 0 },
@@ -386,6 +394,43 @@ fn nativeClose(_: ?*anyopaque, child: *Child) void {
     if (child.err >= 0) posix.close(child.err);
     child.out = -1;
     child.err = -1;
+}
+
+pub const Command = struct { path: [:0]const u8, argv: [*:null]const ?[*:0]const u8 };
+
+fn commandWork(command: Command) u8 {
+    const env = [_:null]?[*:0]const u8{"LC_ALL=C"};
+    return switch (posix.execveZ(command.path, command.argv, &env)) {
+        error.AccessDenied, error.PermissionDenied => 126,
+        else => 127,
+    };
+}
+
+/// Run an already-validated fixed command, bounding both pipes together.
+/// The one-shot caller can exit after a nonblocking reap on cancellation.
+pub fn captureCommand(comptime limit: usize, command: Command) !CaptureBuffer(limit) {
+    if (builtin.os.tag != .linux) return error.UnsupportedPlatform;
+    const deadline = (try collect.bootMillis()) +| 250;
+    var child = try spawn(command, commandWork);
+    var reaped = false;
+    defer if (!reaped) {
+        nativeKill(null, child);
+        nativeClose(null, &child);
+        _ = nativeReap(null, child);
+    };
+    var capture: CaptureBuffer(limit) = .{};
+    while (true) {
+        const now = try collect.bootMillis();
+        if (now >= deadline) return error.CommandTimeout;
+        if (child.drained()) {
+            if (nativeReap(null, child)) |status| {
+                reaped = true;
+                if (!posix.W.IFEXITED(status) or posix.W.EXITSTATUS(status) != 0) return error.CommandFailed;
+                return capture;
+            }
+        }
+        try drain(&child, &capture, @intCast(@min(20, deadline - now)));
+    }
 }
 
 fn fixtureChild(req: Request) u8 {
