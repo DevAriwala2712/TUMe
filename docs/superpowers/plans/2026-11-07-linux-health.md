@@ -124,7 +124,7 @@ try expectEqual(@as(i32, -500), thermalReply("-500\n").temperature);
 
 - [x] **Run red.** `zig test src/tests.zig --test-filter 'tume health task 2'` fails on the missing runner and probe parsing.
 - [x] **Implement `Runner.run`, `Runner.stop` and `collect.take`.** Read trusted kernel files in the parent. Run disk descriptor lookup, mount ID verification and stats, the fixed systemctl command and thermal read in a process group with a hard monotonic deadline and bounded output. Treat exited-but-unreaped processes and child pipes separately; only start a new helper once the previous child is reaped and its pipes are closed. Capture boot-clock elapsed time for `Sample.collection_ms` when collection ends. Never block in the parent waiting for a killed helper. Close inherited descriptors in helpers. Use the spec mapping for invalid, unavailable, permission and missing-source outcomes. `Runner.run` uses `timeout` for exhausted deadlines and `unavailable` when an earlier helper remains unreaped. Use the same launch and cleanup path for timeouts, limit breaches and shutdown.
-- [ ] **Run green.** `zig test src/tests.zig --test-filter 'tume health task 2'` exits 0. On Linux, include model-free helper integration fixtures for timeout, exit and oversize output. They must leave no live test child.
+- [x] **Run green.** `zig test src/tests.zig --test-filter 'tume health task 2'` exits 0. On Linux, include model-free helper integration fixtures for timeout, exit and oversize output. They must leave no live test child.
 - [x] **Commit.** `git add src/health/collect.zig src/health/probe.zig src/tests.zig && git commit -m 'feat: collect bounded Linux device health samples'`
 
 ### Task 3 — Deterministic findings and snapshot command
@@ -204,7 +204,7 @@ try expectEqual(.incompatible, freshness(stamp(0), stamp(1), false));
 
 - [x] **Run red.** `zig test src/tests.zig --test-filter 'tume health task 4'` fails on the missing watch or store interfaces.
 - [x] **Implement `Store`, `watch.cadence`, `watch.run` and the remaining CLI paths.** Lock writers only. Validate and cap every loaded field before resuming. Encode a full bounded record, synchronize and atomically replace from a fixed same-directory temporary name. Use only owner-controlled directory descriptors. Keep streaks in memory through an unsuccessful publish and throttle failure reporting. On signals stop the probe runner and exit the loop. Status readers classify the latest record without taking the writer lock. Missing boot identity or clock data fails explicitly instead of reusing a timestamp.
-- [ ] **Run green.** `zig test src/tests.zig --test-filter 'tume health task 4'` and `zig build test` exit 0. On Linux, run watch `--once` and status against a private local ext4 fixture directory, verify status freshness and change one configured unit to verify exit 3 with `freshness: incompatible`.
+- [x] **Run green.** `zig test src/tests.zig --test-filter 'tume health task 4'` and `zig build test` exit 0. On Linux, run watch `--once` and status against a private local ext4 fixture directory, verify status freshness and change one configured unit to verify exit 3 with `freshness: incompatible`.
 - [x] **Commit.** `git add src/health/state.zig src/health/watch.zig src/health/cli.zig src/tests.zig && git commit -m 'feat: persist fresh local TUMe health and findings'`
 
 ### Task 5 — Unprivileged deployment and pilot evidence
@@ -226,4 +226,4 @@ try expectEqual(.incompatible, freshness(stamp(0), stamp(1), false));
 
 ## Handoff
 
-The portable fixture suite passed during native execution on macOS. Both Linux targets cross-compiled. The remaining checkboxes require a designated Linux host for the native probe fixtures, live watch/status and systemd deployment checks. See the [T1 evidence record](../../evidence/T1-linux-health.md) for the separate physical-device pilot gates.
+The portable fixture suite passed on macOS and both Linux targets cross-compiled. The arm64 Ubuntu VM passed native fixtures, live watch/status and installed systemd checks. The x86_64 native smoke and the separate physical-device gates remain pending. See the [T1 evidence record](../../evidence/T1-linux-health.md).
