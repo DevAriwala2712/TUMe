@@ -1,6 +1,6 @@
 # TUMe product roadmap
 
-Updated 2026-11-08. TUMe is in product incubation. The inherited NanoClaw-Next CLI supplies research memory probing, scheduling, calibration and llama.cpp integration. T1 code is implemented and passed the arm64 Linux VM smoke. The x86_64 native smoke and physical-device pilot remain pending. T2 implements local history and optional diagnostics and passed model-free arm64 Linux VM smoke checks. Held-out model evaluation and workload measurements remain pending. T3–T6 remain proposed. The [market review](MARKET.md) maps existing products and potential deployments to TUMe's build, integrate and defer decisions. The [research plan](RESEARCH_PLAN.md) records upstream work.
+Updated 2026-11-08. TUMe is in product incubation. The inherited NanoClaw-Next CLI supplies research memory probing, scheduling, calibration and llama.cpp integration. T1 code is implemented and passed the arm64 Linux VM smoke. The x86_64 native smoke and physical-device pilot remain pending. T2 implements local history and optional diagnostics and passed model-free arm64 Linux VM smoke checks. Held-out model evaluation and workload measurements remain pending. T3 implements operator-approved and guarded automatic recovery for the registered disposable service. T4–T6 remain proposed. The [market review](MARKET.md) maps existing products and potential deployments to TUMe's build, integrate and defer decisions. The [research plan](RESEARCH_PLAN.md) records upstream work.
 
 **Next T1 gate.** Run the x86_64 installation smoke test and the physical Pi pilot. See the [T1 design](superpowers/specs/2026-11-07-linux-health-design.md) and [implementation plan](superpowers/plans/2026-11-07-linux-health.md) for the implemented scope. The proposed pilot is one Raspberry Pi 4 Model B with 2 GiB RAM running a Mosquitto gateway workload. T1 gives an operator a local read-only snapshot and sustained findings with no network or model. Test whether the evidence and resource profile are worth adding to a gateway that could already use systemd and Monit. Measure against Netdata where the configurations are comparable. Confirm the hardware, workload and gates before treating that setup as the product target.
 
@@ -40,6 +40,8 @@ The [T2.1 design draft](superpowers/specs/2026-11-07-incident-timeline-design.md
 | T2.3 Grounded explanations | Return structured observations, cited evidence IDs, possible cause, uncertainty and next checks. An optional recommendation names a registered procedure and carries no permission. Use an inconclusive result on inadequate evidence or invalid citations. Start with one preinstalled backend. Evaluate an optional resident server only against the same task and resource baseline. | Use held-out, labeled fault scenarios and insufficient-evidence controls. Before evaluation, set minimum correct diagnosis and maximum unsupported claims, plus a budget and refusal target. Report per-fault results, citation validity, false certainty, useful refusals, time and total cost per correct diagnosis against T2.1. |
 
 ## T3 — Verified recovery
+
+See the [operator guide](operations/verified-recovery.md) for the disposable service, separate executors and audit workflow and the [T3 evidence record](evidence/T3-recovery.md) for validation status.
 
 | Work package | Feature and boundaries | Acceptance evidence |
 |---|---|---|

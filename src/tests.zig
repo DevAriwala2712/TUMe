@@ -22,3 +22,7 @@ test {
     _ = @import("diagnostic/admission.zig");
     _ = @import("incident/tests.zig");
 }
+
+test {
+    _ = @import("recovery/tests.zig");
+}

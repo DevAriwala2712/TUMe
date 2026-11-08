@@ -6,6 +6,7 @@ const scheduler = @import("edge/scheduler.zig");
 const health = @import("health/cli.zig");
 const incidents = @import("incident/cli.zig");
 const explanations = @import("diagnostic/cli.zig");
+const recovery = @import("recovery/cli.zig");
 
 const config_path = "nanoclaw-next.conf";
 
@@ -24,6 +25,7 @@ fn printUsage() void {
             "  nanoclaw-next health {{snapshot|watch|status}} --config PATH   Linux device health\n" ++
             "  nanoclaw-next health incidents --config PATH               local incident history\n" ++
             "  nanoclaw-next health explain --config PATH --policy PATH --finding EVIDENCE_KEY\n" ++
+            "  nanoclaw-next recovery preview UNIT                       preview the registered restart\n" ++
             "\n" ++
             "Request flags:\n" ++
             "  --ctx N --min-ctx N --tokens N --deadline-ms N --sensitive\n" ++
@@ -128,6 +130,12 @@ fn realMain() !void {
             explanations.run(allocator, args[3..])
         else
             health.run(allocator, args[2..]);
+        if (code != 0) std.process.exit(code);
+        return;
+    }
+
+    if (std.mem.eql(u8, cmd, "recovery")) {
+        const code = recovery.run(allocator, args[2..]);
         if (code != 0) std.process.exit(code);
         return;
     }

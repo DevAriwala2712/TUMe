@@ -19,6 +19,25 @@ pub fn build(b: *std.Build) void {
 
     b.installArtifact(exe);
 
+    if (target.result.os.tag == .linux) {
+        const recovery_tools = [_]struct { name: []const u8, source: []const u8 }{
+            .{ .name = "tume-recovery-executor", .source = "src/recovery_executor.zig" },
+            .{ .name = "tume-recovery-automatic", .source = "src/recovery_automatic.zig" },
+        };
+        for (recovery_tools) |tool| {
+            const helper = b.addExecutable(.{
+                .name = tool.name,
+                .root_module = b.createModule(.{
+                    .root_source_file = b.path(tool.source),
+                    .target = target,
+                    .optimize = optimize,
+                    .strip = optimize != .Debug,
+                }),
+            });
+            b.installArtifact(helper);
+        }
+    }
+
     const run_cmd = b.addRunArtifact(exe);
     if (b.args) |args| {
         run_cmd.addArgs(args);

@@ -1,0 +1,11 @@
+# T3.3 guarded automatic recovery
+
+Implementation follows successful evidence from the [operator-approved disposable-service trial](../../evidence/T3-recovery.md). The initial scope is the same registered demo unit. The privileged executor owns policy decisions and the shared action lock. The watcher remains a read-only source of findings.
+
+## Policy and execution
+
+A root operator may opt in for a maintenance window of up to 120 seconds for this boot. Use boot time for the window so wall-clock changes and offline operation cannot extend it. A new boot disables the prior policy. The policy and kill switch live in the root-only recovery directory. An absent, invalid or revoked policy denies automatic execution. Removing authorization stops future dispatches, including a pending attempt that has not passed the last authorization check.
+
+Use a separate explicit automation entry point that accepts no action arguments and is unavailable to the sudo operator role. Start only when the registered service is failed and has no pending systemd job. An inactive service could be intentionally stopped. Reuse the durable intent, fixed dispatch, independent verification and reconciliation path from manual execution. Record automation as a distinct authority in the audit. Permit at most one automatic attempt for this target per boot. The rate limit and unresolved or failed attempt circuit breaker survive process restarts through the audit. A later attempt requires a trusted operator to reconcile failures and rearm under the documented policy. Keep the default path operator-approved and provide a timer that requires explicit installation and a start for the current boot. It has no boot enablement target.
+
+Before enabling the example timer on a disposable VM, replay policy expiry, a wrong boot, kill switch revocation before dispatch, an existing approval, lock contention, a failed functional probe and repeated invocation. Compare observed action, functional outcome and operator steps with the manual trial. The systemd fail job mode refuses conflicting queued jobs. Changes from outside the TUMe lock can still occur after the final status query. Keep the physical-device trial and systemd-only comparison explicit in the evidence record.
